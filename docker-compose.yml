@@ -5,4 +5,5 @@ services:
       entrypoint: ./build.sh
       volumes:
         - .:/srcs
+        - /home/varunbhat/workspace/msm_kernel/msm:/kernel
 
