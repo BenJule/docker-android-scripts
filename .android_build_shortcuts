@@ -1,0 +1,150 @@
+#!/bin/bash
+
+export db=$HOME/workspace/projects/dragonboard
+export aosp=$HOME/workspace/aosp
+
+android_device_connected() {
+		echo Waiting to connect to adb
+		while [ `adb devices | grep List -v | grep "^$" -v | wc -l` -eq 0 ]; do
+				sleep 1
+		done;
+}
+
+fastboot_connected() {
+		echo Waiting to connect to fastboot
+		while [ `fastboot devices| wc -l` -eq 0 ]; do
+				sleep 1
+		done
+}
+
+
+start(){
+		if [ $1 == "db" ] ;	then
+				echo "Starting Project Dragonboard Android Compilation meant for superhumans!!"
+				cd $prj_home
+		elif [ $1 == 'compile' ]; then
+				docker-compose up
+		elif [ $1 == 'ghost' ]; then
+				docker-compose up -d
+		elif [ $1 == 'la' ]; then
+				cd $prj_home/out/target/product/$board
+				sudo fastboot flash aboot emmc_appsboot.mbn
+				sudo fastboot flash boot boot.img
+				sudo fastboot flash cache cache.img
+				sudo fastboot flash persist persist.img
+				sudo fastboot flash ramdisk ramdisk.img
+				sudo fastboot flash recovery recovery.img
+				sudo fastboot flash system system.img
+				sudo fastboot flash userdata userdata.img
+				cd -
+				start boot
+		elif [ $1 == 'loadboot' ]; then
+				cd $prj_home/out/target/product/$board
+				sudo fastboot flash boot boot.img
+				cd -
+				adb logcat
+		elif [ $1 == 'boot' ]; then
+				android_device_connected
+				# sudo adb start-server
+				# sleep 2
+				# adb root
+				# android_device_connected
+				# adb shell "echo 8 8 1 8 > /proc/sys/kernel/printk"
+				adb reboot
+				android_device_connected
+				#sleep 5 
+				adb shell dmesg  >> $db/out.txt
+		elif [ $1 == 'erase' ];then
+				echo Waiting for fastboot
+				fastboot_connected
+				echo Erasing Data
+				sudo fastboot erase aboot
+				sudo fastboot erase boot
+				sudo fastboot format cache
+				sudo fastboot erase persist
+				sudo fastboot erase persist
+				sudo fastboot erase ramdisk
+				sudo fastboot format system
+				sudo fastboot format userdata
+		elif [ $1 == 'out' ]; then
+				cd $prj_home/out/target/product/$board
+		elif [ $1 == 'dt' ]; then
+				cd $prj_home/out/target/product/$board
+				dtc -I dtb -O dts -o /tmp/apq8016-sbc.dts ./obj/KERNEL_OBJ/arch/arm64/boot/dts/apq8016-sbc.dtb
+				subl /tmp/apq8016-sbc.dts
+				cd -
+		elif [ $1 == 'i2ctools' ]; then
+				cd $prj_home/out/target/product/$board
+				android_device_connected
+				echo Starting as root
+				sudo adb start-server
+				sleep 2
+				adb root
+				android_device_connected
+
+				echo Copying to /bin
+				adb push ./system/bin/i2cset    /sdcard/i2cset
+				adb push ./system/bin/i2cdump   /sdcard/i2cdump
+				adb push ./system/bin/i2cget    /sdcard/i2cget
+				adb push ./system/bin/i2cdetect /sdcard/i2cdetect
+
+				echo Mounting
+				adb shell "mount -o rw,remount,rw /system && mv /sdcard/i2c* /bin"
+				android_device_connected
+
+				echo Remounting
+				adb shell "mount -o ro,remount,ro /system"
+				android_device_connected
+
+				echo Restarting device
+				adb reboot
+				cd -
+		elif [ $1 == 'listi2c' ]; then
+				android_device_connected
+				adb root
+				android_device_connected
+				adb shell i2cdetect
+		elif [ $1 == 'disphdmi' ]; then
+				sudo fastboot oem select-display-panel adv7533_1080p
+		elif [ $1 == 'disptd' ]; then
+				sudo fastboot oem select-display-panel td4291_720p
+		elif [ $1 == 'lalocal' ]; then
+				sudo fastboot flash boot boot.img
+				sudo fastboot flash cache cache.img
+				sudo fastboot flash persist persist.img
+				sudo fastboot flash system system.img
+				sudo fastboot flash userdata userdata.img
+				sudo fastboot flash recovery recovery.img
+		elif [ $1 == 'getlogs' ]; then
+				start db
+				android_device_connected
+				adb shell dmesg >> out.txt
+				cd -
+		elif [ $1 == 'help' ]; then
+				echo listi2c    : Lists the devices connected
+				echo i2ctools   : Installs i2c package
+				echo dt         : converts compiled device tree to dts
+				echo out        : cd to output directory
+				echo erase      : erases partitions on the device
+				echo boot       : Gets the boot logs after restarting the device
+				echo loadboot   : Loads the bootloader and gets the boot logs
+				echo compile    : compiles the android source using docker
+				echo disphdmi   : changes display to hdmi
+				echo disptd     : changes display to touch display
+				echo db         : Opens the project
+				echo getlogs    : Gets logs without booting
+				echo lalocal    : Loads from the local folder on to the device
+		fi
+
+
+}
+
+aosp_prj(){
+		export board=dragonboard
+		export prj_home=$aosp
+}
+
+db_prj(){
+		export board=msm8916_64
+		export prj_home=$db
+}
