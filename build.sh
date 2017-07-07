@@ -8,9 +8,15 @@ export CCACHE_COMPRESS=1
 lunch msm8916_64-userdebug
 prebuilts/misc/linux-x86/ccache/ccache -M 50G
 
-
+apt-get install libssl-dev libffi-dev -y
 while [ 1 ]; do 
 	#make clobber
-	make 
-	#echo Hello
+	make -j10 bootimage
+	if [ 0 -eq $? ]
+	then 
+		break 
+	fi
+	break
 done
+
+#mmm hardware/i2c-tools
